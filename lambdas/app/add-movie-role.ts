@@ -9,12 +9,15 @@ export const handler = async (
   const body = parseJsonObject(event);
   if (isResponse(body)) return body;
 
-  const role: Role = {
-    movieId: body.movieId as number,
-    actorId: body.actorId as number,
-    roleName: body.roleName as string,
-    roleDescription: body.roleDescription as string,
-  };
+  // Validate required fields
+  const { movieId, actorId, roleName, roleDescription } = body;
+  if (typeof movieId !== 'number' || typeof actorId !== 'number') {
+    return response(400, { message: "movieId and actorId must be numbers" });
+  }
+  if (typeof roleName !== 'string' || typeof roleDescription !== 'string') {
+    return response(400, { message: "roleName and roleDescription must be strings" });
+  }
+  const role: Role = { movieId, actorId, roleName, roleDescription };
 
   try {
     await ddb.send(
@@ -47,7 +50,20 @@ export const handler = async (
       })
     );
     return response(201, { message: "Role added", data: role });
-  } catch (err) {
+  } catch (err: any) {
+    // TransactionCanceledException: movie/actor not found, or role already exists
+    if (err.name === 'TransactionCanceledException') {
+      const reasons: { Code: string }[] = err.CancellationReasons ?? [];
+      if (reasons[0]?.Code === 'ConditionalCheckFailed') {
+        return response(404, { message: `Movie ${role.movieId} not found` });
+      }
+      if (reasons[1]?.Code === 'ConditionalCheckFailed') {
+        return response(404, { message: `Actor ${role.actorId} not found` });
+      }
+      if (reasons[2]?.Code === 'ConditionalCheckFailed') {
+        return response(409, { message: "Role for this movie and actor already exists" });
+      }
+    }
     console.error("DynamoDB error:", err);
     return response(500, { message: "Internal server error", error: err });
   }
