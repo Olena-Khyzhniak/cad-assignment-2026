@@ -40,6 +40,10 @@ export const handler = async (
     );
 
     const resultItems = queryResult.Items ?? [];
+    // Empty result means the movie does not exist or has no roles yet
+    if (resultItems.length === 0) {
+      return response(404, { message: `Movie ${movieId} not found` });
+    }
     return response(200, { data: resultItems.filter(isRoleItem).map(toRole) });
   } catch (err) {
     console.error("DynamoDB error:", err);
