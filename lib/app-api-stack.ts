@@ -92,14 +92,29 @@ export class AppApiStack extends cdk.Stack {
       authorizer: userAuthorizer,
       authorizationType: apig.AuthorizationType.CUSTOM,
     };
+    // API key and usage plan for admin (POST endpoints)
+    const apiKey = api.addApiKey('AdminApiKey');
+    const usagePlan = api.addUsagePlan('AdminUsagePlan', {
+      throttle: { rateLimit: 10, burstLimit: 20 },
+    });
+    usagePlan.addApiKey(apiKey);
+    usagePlan.addApiStage({ stage: api.deploymentStage });
+
+    new cdk.CfnOutput(this, 'AdminApiKeyId', { value: apiKey.keyId });
+
     // Routes
     const moviesResource = api.root.addResource('movies');
 
+    // Public endpoint - no auth required
     const movieRolesResource = moviesResource.addResource('{movieID}').addResource('roles');
     movieRolesResource.addMethod('GET', new apig.LambdaIntegration(getMovieRolesFn));
 
-    // POST /movies/roles - add a new role (no auth yet)
-    moviesResource.addResource('roles').addMethod('POST', new apig.LambdaIntegration(addMovieRoleFn));
+    // Protected endpoint - requires API key
+    moviesResource.addResource('roles').addMethod(
+      'POST',
+      new apig.LambdaIntegration(addMovieRoleFn),
+      { apiKeyRequired: true },
+    );
 
     api.root
       .addResource('actors')
