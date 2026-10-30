@@ -23,7 +23,7 @@ export const handler = async (
   }
 
   // Optional ?actor=actorID filter
-  const actorId = parseId(event.queryStringParameters?.actor ?? undefined);
+  const actorId = parseId(event.queryStringParameters?.actor);
 
   try {
     const queryResult = await ddb.send(
