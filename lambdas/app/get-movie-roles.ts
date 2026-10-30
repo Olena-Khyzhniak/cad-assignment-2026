@@ -1,6 +1,7 @@
 import type { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
-import { GetCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
+import { QueryCommand } from "@aws-sdk/lib-dynamodb";
 import {
+  actorKey,
   ddb,
   isRoleItem,
   movieKey,
@@ -20,13 +21,21 @@ export const handler = async (
   if (movieId === undefined) {
     return response(400, { message: "movieID must be a positive integer" });
   }
+
+  // Optional ?actor=actorID filter
+  const actorId = parseId(event.queryStringParameters?.actor ?? undefined);
+
   try {
     const queryResult = await ddb.send(
       new QueryCommand({
         TableName: tableName,
-        KeyConditionExpression: "PK = :pk",
-        ExpressionAttributeValues: { ":pk": movieKey(movieId) },
-        // ExclusiveStartKey: lastKey,
+        // If actor filter provided, narrow to the single role item via SK
+        KeyConditionExpression: actorId
+          ? "PK = :pk AND SK = :sk"
+          : "PK = :pk",
+        ExpressionAttributeValues: actorId
+          ? { ":pk": movieKey(movieId), ":sk": actorKey(actorId) }
+          : { ":pk": movieKey(movieId) },
       })
     );
 
@@ -34,9 +43,6 @@ export const handler = async (
     return response(200, { data: resultItems.filter(isRoleItem).map(toRole) });
   } catch (err) {
     console.error("DynamoDB error:", err);
-    return response(500, {
-      message: "Internal server error",
-      error: err,
-    });
+    return response(500, { message: "Internal server error", error: err });
   }
 };
