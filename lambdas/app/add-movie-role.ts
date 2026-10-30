@@ -40,10 +40,11 @@ export const handler = async (
             },
           },
           {
-            // Write the role item
+            // Write the role item; fails if role already exists
             Put: {
               TableName: tableName,
               Item: { PK: movieKey(role.movieId), SK: actorKey(role.actorId), ...role },
+              ConditionExpression: "attribute_not_exists(PK)",
             },
           },
         ],
