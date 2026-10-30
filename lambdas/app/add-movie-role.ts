@@ -21,19 +21,26 @@ export const handler = async (
       new TransactWriteCommand({
         TransactItems: [
           {
-            // Write the role item; fails if the movie does not exist
-            Put: {
+            // Verify the movie exists
+            ConditionCheck: {
               TableName: tableName,
-              Item: { PK: movieKey(role.movieId), SK: actorKey(role.actorId), ...role },
+              Key: { PK: movieKey(role.movieId), SK: movieKey(role.movieId) },
               ConditionExpression: "attribute_exists(PK)",
             },
           },
           {
-            // Verify the actor exists without writing anything
+            // Verify the actor exists
             ConditionCheck: {
               TableName: tableName,
               Key: { PK: actorKey(role.actorId), SK: actorKey(role.actorId) },
               ConditionExpression: "attribute_exists(PK)",
+            },
+          },
+          {
+            // Write the role item
+            Put: {
+              TableName: tableName,
+              Item: { PK: movieKey(role.movieId), SK: actorKey(role.actorId), ...role },
             },
           },
         ],
